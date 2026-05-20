@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>林途规划工作台 - 高级升学数据库</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --panel-bg: #111827;
+            --border-color: #1f2937;
+            --neon-blue: #3b82f6;
+            --neon-purple: #8b5cf6;
+            --neon-cyan: #06b6d4;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Noto Sans SC', sans-serif; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(6, 182, 212, 0.08), transparent 25%);
+        }
+
+        /* 顶部导航栏 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #fff, var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-links { display: flex; gap: 20px; }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+            color: var(--neon-purple);
+        }
+
+        .nav-btn.primary {
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+            border: none;
+            color: #fff;
+        }
+
+        .nav-btn.primary:hover {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+            color: #fff;
+        }
+
+        /* 核心矩阵区域 */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px 180px 20px; 
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .dashboard-title {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .dashboard-title h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .dashboard-title p { color: var(--text-muted); font-size: 16px; }
+
+        .grid-matrix {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            width: 100%;
+        }
+
+        .matrix-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .matrix-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .matrix-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.15);
+        }
+
+        .matrix-card:hover::before { opacity: 1; }
+
+        .card-icon {
+            font-size: 28px;
+            margin-bottom: 16px;
+            color: var(--neon-cyan);
+        }
+
+        .matrix-card:nth-child(4n-2) .card-icon { color: var(--neon-purple); }
+        .matrix-card:nth-child(4n-1) .card-icon { color: var(--neon-blue); }
+
+        .matrix-card h3 { font-size: 18px; margin-bottom: 8px; z-index: 1; position: relative; }
+        .matrix-card p { font-size: 13px; color: var(--text-muted); z-index: 1; position: relative; line-height: 1.5; }
+
+        /* 底部智能检索舱 */
+        .search-cabin {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(to top, var(--bg-dark) 80%, transparent);
+            padding: 0 20px 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        /* 聊天气泡展示区 */
+        .chat-container {
+            width: 100%;
+            max-width: 900px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 10px;
+        }
+
+        /* 滚动条美化 */
+        .chat-container::-webkit-scrollbar { width: 6px; }
+        .chat-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .message {
+            max-width: 85%;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            line-height: 1.6;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .msg-user {
+            background: var(--border-color);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg-bot {
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .msg-bot strong { color: var(--neon-cyan); }
+        .msg-bot .danger { color: #ef4444; }
+
+        .input-wrapper {
+            width: 100%;
+            max-width: 900px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--panel-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px 60px 20px 24px;
+            color: #fff;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 25px rgba(139, 92, 246, 0.3);
+            background: #161f33;
+        }
+
+        .send-btn {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+
+        .send-btn:hover { transform: translateY(-50%) scale(1.05); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-cube"></i>
+            林途规划工作台
+        </div>
+        <div class="nav-links">
+            <button class="nav-btn"><i class="fa-solid fa-layer-group"></i> 报告学习</button>
+            <button class="nav-btn"><i class="fa-solid fa-chart-pie"></i> 志愿初选</button>
+            <button class="nav-btn"><i class="fa-solid fa-share-nodes"></i> 引流获客</button>
+            <button class="nav-btn primary"><i class="fa-brands fa-weixin"></i> 微信登录</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="dashboard-title">
+            <h1>专家级 AI 升学规划仪表盘</h1>
+            <p>基于 86 份核心私密研报，直击招考潜规则，拒绝空洞套话</p>
+        </div>
+
+        <div class="grid-matrix">
+            <div class="matrix-card" onclick="fillInput('武汉大学 院校详情')">
+                <i class="fa-solid fa-university card-icon"></i>
+                <h3>院校详情</h3>
+                <p>1200+ 院校底座，看穿层级与硕博点实力</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('学院查询')">
+                <i class="fa-solid fa-sitemap card-icon"></i>
+                <h3>学院查询</h3>
+                <p>深度透视各大学二级学院的真实王牌</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('电子信息 专业实力')">
+                <i class="fa-solid fa-bolt card-icon"></i>
+                <h3>专业实力</h3>
+                <p>林途毒舌点评：到底是王炸还是换皮？</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('专业方向')">
+                <i class="fa-solid fa-compass card-icon"></i>
+                <h3>专业方向</h3>
+                <p>基于产业集群的 86 份核心去向纪要</p>
+            </div>
+            
+            <div class="matrix-card" onclick="fillInput('录取数据')">
+                <i class="fa-solid fa-chart-line card-icon"></i>
+                <h3>录取数据</h3>
+                <p>精准对接位次，不仅看分，更看“位子”</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('同分去向')">
+                <i class="fa-solid fa-users card-icon"></i>
+                <h3>同分去向</h3>
+                <p>大数据画像：往届同分段的孩子去了哪？</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('升学保研')">
+                <i class="fa-solid fa-rocket card-icon"></i>
+                <h3>升学保研</h3>
+                <p>核心私密资料：哪些学校是保研神校？</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('考研分数')">
+                <i class="fa-solid fa-file-signature card-icon"></i>
+                <h3>考研分数</h3>
+                <p>预判“考研二次高考”的真实难度曲线</p>
+            </div>
+
+            <div class="matrix-card" onclick="fillInput('地区产业')">
+                <i class="fa-solid fa-city card-icon"></i>
+                <h3>地区产业</h3>
+                <p>将城市经济发展与专业选择深度挂钩</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('低空经济 城市专业')">
+                <i class="fa-solid fa-map-location-dot card-icon"></i>
+                <h3>城市专业</h3>
+                <p>选专业即选城市，透视风口产业群</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('本地排序')">
+                <i class="fa-solid fa-list-ol card-icon"></i>
+                <h3>本地排序</h3>
+                <p>省内地头蛇院校的真实江湖地位</p>
+            </div>
+            <div class="matrix-card" onclick="fillInput('电网 考公岗位')">
+                <i class="fa-solid fa-briefcase card-icon"></i>
+                <h3>考公/国企岗位</h3>
+                <p>直接对接电网、烟草、体制内真实岗位</p>
+            </div>
+        </div>
+    </main>
+
+    <div class="search-cabin">
+        <div style="width: 100%; max-width: 900px; display: flex; justify-content: flex-end; margin-bottom: 8px;">
+            <button onclick="clearChat()" style="background: transparent; color: var(--text-muted); border: none; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 5px; transition: color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#9ca3af'">
+                <i class="fa-solid fa-trash-can"></i> 清空当前看板
+            </button>
+        </div>
+        
+        <div class="chat-container" id="chatContainer"></div>
+        
+        <div class="input-wrapper">
+            <input type="text" id="searchInput" class="search-input" placeholder="输入学校或专业，如：‘武汉大学院校详情’ 或 ‘四川大学半导体工艺与装备’..." autocomplete="off" onkeypress="handleEnter(event)">
+            <button class="send-btn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const chatContainer = document.getElementById('chatContainer');
+
+        function clearChat() {
+            chatContainer.innerHTML = '';
+        }
+
+        function fillInput(text) {
+            searchInput.value = text;
+            searchInput.focus();
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const text = searchInput.value.trim();
+            if (!text) return;
+
+            appendMessage(text, 'msg-user');
+            searchInput.value = '';
+
+            const loadingId = 'loading-' + Date.now();
+            appendMessage('🧠 林途大脑疯狂云端检索中...', 'msg-bot', loadingId);
+
+            try {
+                // 🚀 核心变更：不再带钥匙直接找扣子，而是找咱们自己的 Vercel 后台！
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const data = await res.json();
+                
+                const loadingElement = document.getElementById(loadingId);
+                if (loadingElement) loadingElement.remove();
+
+                if (res.status !== 200) throw new Error(data.error || "云端保险柜通讯失败");
+
+                let finalReply = data.reply;
+                finalReply = finalReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                finalReply = finalReply.replace(/\n/g, '<br>');
+
+                appendMessage(finalReply, 'msg-bot');
+
+            } catch (error) {
+                const loadingElement = document.getElementById(loadingId);
+                if (loadingElement) loadingElement.remove();
+                appendMessage(`❌ 报告艳姐，云端网线断了！报错原因：${error.message}`, 'msg-bot');
+            }
+        }
+
+        function appendMessage(htmlContent, className, id = null) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${className}`;
+            if (id) msgDiv.id = id;
+            msgDiv.innerHTML = htmlContent;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
