@@ -1,20 +1,34 @@
+// ============================================================
+//  林途规划工作台 / Lintu — Coze Bot 代理 (Vercel Serverless)
+// ============================================================
+//  安全要点：
+//  - API Token 必须通过 Vercel 环境变量 COZE_API_TOKEN 注入，
+//    绝不能硬编码到代码里（公开仓库会被爬走、扣费）。
+//  - BOT_ID 也建议放到环境变量 COZE_BOT_ID，方便切换不同智能体。
+// ============================================================
+
 export default async function handler(req, res) {
-    // 保护机制：只允许前端发送 POST 提问请求
+    // ---------- 1. 基础校验 ----------
     if (req.method !== 'POST') {
         return res.status(405).json({ error: '只允许 POST 请求' });
     }
 
-    // 🔐 你的真钥匙锁在这里！任何人都扒不到！
-    const API_TOKEN = "sat_9LiYIkLDXHHCdHEkdUqZ7t265m37PGD19Vlu9oHujmZOohge24bPl6R9SBbDyVJv"; 
-    const BOT_ID = "7641616811686936610";
+    const API_TOKEN = process.env.COZE_API_TOKEN;
+    const BOT_ID = process.env.COZE_BOT_ID;
 
-    const { text } = req.body;
-    if (!text) {
+    if (!API_TOKEN || !BOT_ID) {
+        return res.status(500).json({
+            error: '服务未正确配置：请在 Vercel 设置 COZE_API_TOKEN 与 COZE_BOT_ID 环境变量'
+        });
+    }
+
+    const { text } = req.body || {};
+    if (!text || typeof text !== 'string' || !text.trim()) {
         return res.status(400).json({ error: '没有收到查询关键词' });
     }
 
+    // ---------- 2. 发起对话 ----------
     try {
-        // 1. 在云端偷偷发起与扣子的对话
         const chatRes = await fetch('https://api.coze.cn/v3/chat', {
             method: 'POST',
             headers: {
@@ -35,51 +49,67 @@ export default async function handler(req, res) {
         });
 
         const chatData = await chatRes.json();
-        if (chatData.code !== 0) throw new Error(chatData.msg || "云端对接扣子失败");
+        if (chatData.code !== 0) {
+            throw new Error(chatData.msg || "云端对接扣子失败");
+        }
 
         const chatId = chatData.data.id;
         const convId = chatData.data.conversation_id;
 
-        // 2. 轮询等待大模型思考完毕（最多等 30 秒防卡死）
+        // ---------- 3. 轮询等待模型回答（最多 45 秒） ----------
         let isCompleted = false;
         let timeout = 0;
-        while (!isCompleted && timeout < 30) {
+        const MAX_WAIT_SECONDS = 45;
+
+        while (!isCompleted && timeout < MAX_WAIT_SECONDS) {
             await new Promise(resolve => setTimeout(resolve, 1000));
             timeout++;
 
-            const statusRes = await fetch(`https://api.coze.cn/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${convId}`, {
+            const statusRes = await fetch(
+                `https://api.coze.cn/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${convId}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${API_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            const statusData = await statusRes.json();
+            const status = statusData?.data?.status;
+
+            if (status === 'completed') {
+                isCompleted = true;
+            } else if (status === 'failed' || status === 'canceled' || status === 'requires_action') {
+                throw new Error(`模型处理中断（状态：${status}）`);
+            }
+        }
+
+        if (!isCompleted) {
+            throw new Error("林途大脑思考超时，请稍后再问一次");
+        }
+
+        // ---------- 4. 取回最终消息 ----------
+        const msgRes = await fetch(
+            `https://api.coze.cn/v3/chat/message/list?chat_id=${chatId}&conversation_id=${convId}`,
+            {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${API_TOKEN}`,
                     'Content-Type': 'application/json'
                 }
-            });
-            const statusData = await statusRes.json();
-            if (statusData.data.status === 'completed') {
-                isCompleted = true;
-            } else if (statusData.data.status === 'failed' || statusData.data.status === 'canceled') {
-                throw new Error("模型处理中断");
             }
-        }
-
-        if (!isCompleted) throw new Error("扣子大脑思考超时");
-
-        // 3. 提取最终的毒舌报告并返回给前端
-        const msgRes = await fetch(`https://api.coze.cn/v3/chat/message/list?chat_id=${chatId}&conversation_id=${convId}`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${API_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        );
         const msgData = await msgRes.json();
-        
-        const botMessages = msgData.data.filter(m => m.type === 'answer');
-        let finalReply = botMessages.length > 0 ? botMessages[botMessages.length - 1].content : "未获取到有效数据";
+
+        const botMessages = (msgData?.data || []).filter(m => m.type === 'answer');
+        const finalReply = botMessages.length > 0
+            ? botMessages[botMessages.length - 1].content
+            : "未获取到有效数据";
 
         return res.status(200).json({ reply: finalReply });
 
     } catch (error) {
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message || '未知错误' });
     }
 }
